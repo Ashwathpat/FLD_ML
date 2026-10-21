@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.python-version
+.venv/
+venv/
+ENV/
+env/
+*.joblib
+*.pkl
+*.h5
+
+# Datasets & Large Artifacts
+ml/data/raw/
+ml/data/processed/
+ml/data/uploads/
+
+# C++ / CUDA / CMake
+cuda/build/
+cuda/bin/
+*.o
+*.obj
+*.exe
+*.out
+
+# Environment & Secrets
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.secret
+*.credentials
+*.tfvars
+*.tfvars.json
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*.docx
+*.tmp
+archive/

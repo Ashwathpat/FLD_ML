@@ -1,0 +1,74 @@
+services:
+  api:
+    image: ${IMAGE:-fld-api:local}
+    build:
+      context: ../..
+      dockerfile: app/Dockerfile
+    env_file: .env
+    environment:
+      - PREPROC_BACKEND=cpu
+      - CLOUD_NAME=local
+      - DATABASE_URL=postgresql://fld_user:fld_password@postgres:5432/fld_db
+      - STORAGE_BUCKET=fld-images
+    restart: unless-stopped
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fld_db
+      POSTGRES_USER: fld_user
+      POSTGRES_PASSWORD: fld_password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fld_user -d fld_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  replicator:
+    profiles: ["aws"]
+    image: ${REPLICATOR_IMAGE:-fld-replicator:local}
+    build:
+      context: ../..
+      dockerfile: app/replicator/Dockerfile
+    env_file: .env
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  caddy_data:
+  minio_data:

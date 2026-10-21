@@ -1,0 +1,4 @@
+Drill_ID,Detection_Time_s,DNS_Propagation_s,Total_RTO_s,Data_Replication_Lag_RPO_s,Result
+Drill #1: Primary Web Crash,28.5,11.2,39.7,14.2,PASS
+Drill #2: Database Outage,31.0,12.8,43.8,15.6,PASS
+Drill #3: Network Partition,30.2,13.5,43.7,14.6,PASS

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLD-Screen Dashboard</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/app/style.css">
+</head>
+<body>
+
+    <!-- Gradient Orbs in Background -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="glass-panel main-header">
+            <div class="logo">
+                <h1>FLD<span>Screen</span></h1>
+                <p>AI-Powered Fatty Liver Disease Analysis Tool</p>
+            </div>
+            <div class="cloud-status">
+                <span class="pulse-dot"></span>
+                <span id="server-status">API Connected</span>
+            </div>
+        </header>
+
+        <main class="content-grid">
+            <!-- Left Panel: Upload & Clinical Data -->
+            <section class="glass-panel upload-section">
+                <h2>1. Input Patient Data</h2>
+                
+                <form id="predict-form">
+                    
+                    <!-- Image Upload Zone -->
+                    <div class="upload-zone" id="drop-zone">
+                        <input type="file" id="image-upload" name="file" accept="image/jpeg, image/png" required hidden>
+                        <label for="image-upload" class="upload-label">
+                            <div class="upload-icon">📸</div>
+                            <span id="file-name">Click or Drag & Drop Image Here<br><small>PNG, JPG up to 10MB</small></span>
+                        </label>
+                    </div>
+
+                    <!-- Clinical Details -->
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label>Age</label>
+                            <input type="number" name="age" placeholder="e.g. 45" min="1" max="120">
+                        </div>
+                        <div class="input-group">
+                            <label>Gender</label>
+                            <select name="gender">
+                                <option value="">Select...</option>
+                                <option value="1">Male</option>
+                                <option value="0">Female</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Height (cm)</label>
+                            <input type="number" name="height" placeholder="e.g. 170" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label>Weight (kg)</label>
+                            <input type="number" name="weight" placeholder="e.g. 70" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label>Waist (cm)</label>
+                            <input type="number" name="waist" placeholder="e.g. 85" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label>Hipline (cm)</label>
+                            <input type="number" name="hipline" placeholder="e.g. 95" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label>Systolic BP</label>
+                            <input type="number" name="sbp" placeholder="e.g. 120" step="1">
+                        </div>
+                        <div class="input-group">
+                            <label>Diastolic BP</label>
+                            <input type="number" name="dbp" placeholder="e.g. 80" step="1">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submit-btn">Run AI Diagnostic</button>
+                    <div id="loading-spinner" class="spinner hidden"></div>
+                </form>
+            </section>
+
+            <!-- Right Panel: Results & Graphs -->
+            <section class="glass-panel results-section" id="results-panel">
+                <div class="results-placeholder">
+                    <p>Enter data and run diagnostic to view AI analysis.</p>
+                </div>
+                
+                <div class="results-content hidden" id="results-content">
+                    <div class="primary-result">
+                        <h3>Prediction Target</h3>
+                        <div class="result-badge" id="result-label">Processing...</div>
+                    </div>
+
+                    <div class="charts-container">
+                        <div class="chart-box">
+                            <h4>Probability Split</h4>
+                            <div class="canvas-wrapper">
+                                <canvas id="donut-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-box">
+                            <h4>SHAP Feature Importance</h4>
+                            <div class="canvas-wrapper">
+                                <canvas id="bar-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="disclaimer-box">
+                        <strong>⚠️ Disclaimer:</strong> <span id="disclaimer-text"></span>
+                        <p class="served-by" id="served-by-text"></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/app/app.js"></script>
+</body>
+</html>

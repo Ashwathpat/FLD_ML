@@ -1,0 +1,5 @@
+Resolution,Gauss_MaxAbsDiff,Gauss_PSNR_dB,Sobel_MaxAbsDiff,Sobel_PSNR_dB
+256x256,3.0,52.11,4.0,68.34
+512x512,3.0,52.33,1.0,91.18
+1024x1024,2.0,52.43,4.0,86.91
+2048x2048,2.0,52.55,4.0,89.16
