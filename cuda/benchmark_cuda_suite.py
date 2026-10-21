@@ -392,31 +392,31 @@ plt.savefig(os.path.join(OUTPUT_DIR, "amdahls_law_analysis.png"))
 plt.close()
 
 # Figure 6: Architectural Diagram - Shared Memory Tiling with Halo Region
-fig, ax = plt.subplots(figsize=(7, 6))
+fig, ax = plt.subplots(figsize=(7.5, 6.5))
 ax.set_xlim(-1, 9)
-ax.set_ylim(-1, 9)
+ax.set_ylim(-1.5, 9)
 ax.axis('off')
 
 # Outer halo boundary (Shared memory tile: 20x20 for 16x16 with halo=2)
-outer_rect = plt.Rectangle((0.5, 0.5), 7, 7, linewidth=2.5, edgecolor='#e74c3c', facecolor='#fadbd8', linestyle='--', label='Shared Memory Tile (Halo Extended)')
+outer_rect = plt.Rectangle((0.2, 0.2), 7.6, 7.6, linewidth=2.5, edgecolor='#e74c3c', facecolor='#fadbd8', linestyle='--', label='Shared Memory Tile (Halo Extended)')
 ax.add_patch(outer_rect)
 
 # Inner compute tile (16x16 compute block)
-inner_rect = plt.Rectangle((1.5, 1.5), 5, 5, linewidth=3, edgecolor='#2980b9', facecolor='#aed6f1', label='Active Thread Block (16x16)')
+inner_rect = plt.Rectangle((1.8, 1.8), 4.4, 4.4, linewidth=3, edgecolor='#2980b9', facecolor='#aed6f1', label='Active Thread Block (16x16)')
 ax.add_patch(inner_rect)
 
 # Center anchor point
-ax.scatter([4], [4], color='#8e44ad', s=120, zorder=5, label='Center Output Pixel (x, y)')
+ax.scatter([4], [4], color='#8e44ad', s=130, zorder=5, label='Center Output Pixel (x, y)')
 
 # Annotations
-ax.text(4, 4.3, 'Target Pixel P(x, y)', ha='center', fontsize=10, fontweight='bold', color='#8e44ad')
-ax.text(4, 7.1, 'Top Halo (ky in [-2, -1])', ha='center', fontsize=9, fontweight='bold', color='#c0392b')
-ax.text(4, 0.8, 'Bottom Halo (ky in [+1, +2])', ha='center', fontsize=9, fontweight='bold', color='#c0392b')
-ax.text(0.9, 4, 'Left Halo\n(kx < 0)', va='center', ha='center', fontsize=8, fontweight='bold', color='#c0392b')
-ax.text(7.1, 4, 'Right Halo\n(kx > 0)', va='center', ha='center', fontsize=8, fontweight='bold', color='#c0392b')
-ax.text(4, 2.5, 'Shared Memory __syncthreads()\nZero Global Memory Thrashing', ha='center', fontsize=10, style='italic', color='#1a5276')
+ax.text(4, 4.35, 'Target Pixel P(x, y)', ha='center', fontsize=10, fontweight='bold', color='#8e44ad')
+ax.text(4, 7.25, 'Top Halo Region (ky in [-2, -1])', ha='center', fontsize=9, fontweight='bold', color='#c0392b')
+ax.text(4, 0.75, 'Bottom Halo Region (ky in [+1, +2])', ha='center', fontsize=9, fontweight='bold', color='#c0392b')
+ax.text(1.0, 4.0, 'Left Halo\n(kx < 0)', va='center', ha='center', fontsize=8.5, fontweight='bold', color='#c0392b')
+ax.text(7.0, 4.0, 'Right Halo\n(kx > 0)', va='center', ha='center', fontsize=8.5, fontweight='bold', color='#c0392b')
+ax.text(4, 2.5, 'Shared Memory __syncthreads()\nZero Global Memory Thrashing', ha='center', fontsize=9.5, style='italic', color='#1a5276')
 
-ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=True, fontsize=9)
+ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.16), ncol=2, frameon=True, fontsize=9)
 plt.title('Figure 6: 2D Shared-Memory Tiling with Boundary Halo Regions', fontsize=12, fontweight='bold', pad=15)
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_DIR, "cuda_tiling_diagram.png"), bbox_inches='tight')

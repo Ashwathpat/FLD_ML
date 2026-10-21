@@ -98,23 +98,23 @@ plt.close()
 # -------------------------------------------------------------
 # 2. Route 53 Failover Lifecycle Flowchart
 # -------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(10, 5))
-ax.set_xlim(0, 10)
-ax.set_ylim(0, 5)
+fig, ax = plt.subplots(figsize=(13, 5.5))
+ax.set_xlim(0, 13)
+ax.set_ylim(0, 5.5)
 ax.axis('off')
 
 steps = [
-    ("1. Primary\nNormal Ops\nHTTP 200 /healthz", 0.6, 2.0, 1.6, 1.8, '#d4efdf', '#196f3d'),
-    ("2. Primary Failure\nOutage / Timeout\nHTTP 500 or Drop", 2.6, 2.0, 1.6, 1.8, '#fadbd8', '#922b21'),
-    ("3. Route 53 Health\nCheck Fails 3x\n(Threshold = 30s)", 4.6, 2.0, 1.6, 1.8, '#fcf3cf', '#b7950b'),
-    ("4. DNS Failover\nCNAME flips to\nAzure East US", 6.6, 2.0, 1.6, 1.8, '#ebf5fb', '#2471a3'),
-    ("5. Recovery & Drill\nSNS Notification\nRTO = 42s, RPO = 15s", 8.6, 2.0, 1.2, 1.8, '#e8daef', '#6c3483')
+    ("1. Primary\nNormal Ops\nHTTP 200 /healthz", 0.4, 2.0, 2.0, 1.8, '#d4efdf', '#196f3d'),
+    ("2. Primary Failure\nOutage / Timeout\nHTTP 500 or Drop", 2.9, 2.0, 2.0, 1.8, '#fadbd8', '#922b21'),
+    ("3. Route 53 Health\nCheck Fails 3x\n(Threshold = 30s)", 5.4, 2.0, 2.0, 1.8, '#fcf3cf', '#b7950b'),
+    ("4. DNS Failover\nCNAME Flips to\nAzure East US", 7.9, 2.0, 2.0, 1.8, '#ebf5fb', '#2471a3'),
+    ("5. Recovery & Drill\nSNS Notification\nRTO=42s, RPO=15s", 10.4, 2.0, 2.0, 1.8, '#e8daef', '#6c3483')
 ]
 
 for title, x, y, w, h, bg, border in steps:
     rect = plt.Rectangle((x, y), w, h, facecolor=bg, edgecolor=border, linewidth=2)
     ax.add_patch(rect)
-    ax.text(x + w/2, y + h/2, title, ha='center', va='center', fontsize=8.5, fontweight='bold', color=border)
+    ax.text(x + w/2, y + h/2, title, ha='center', va='center', fontsize=9, fontweight='bold', color=border)
 
 for i in range(len(steps) - 1):
     x_s = steps[i][1] + steps[i][3]
@@ -123,11 +123,11 @@ for i in range(len(steps) - 1):
                 arrowprops=dict(facecolor='#34495e', edgecolor='#34495e', width=2, headwidth=6))
 
 # Feedback loop for self-healing
-ax.annotate('', xy=(1.4, 2.0), xytext=(9.2, 2.0),
+ax.annotate('', xy=(1.4, 2.0), xytext=(11.4, 2.0),
             arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.3", color='#27ae60', lw=2, linestyle='dotted'))
-ax.text(5.3, 0.4, 'Automated Failback on Primary Healthy Probes (3 Successes)', ha='center', fontsize=9, fontweight='bold', color='#27ae60')
+ax.text(6.5, 0.4, 'Automated Failback on Primary Healthy Probes (3 Successes)', ha='center', fontsize=10, fontweight='bold', color='#27ae60')
 
-plt.title('Figure 2: Automated Route 53 Health Probe & Failover Sequence', fontsize=12, fontweight='bold', pad=15)
+plt.title('Figure 2: Automated Route 53 Health Probe & Failover Sequence', fontsize=13, fontweight='bold', pad=15)
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_DIR, "route53_failover_flowchart.png"), bbox_inches='tight')
 plt.close()
