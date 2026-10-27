@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/dr-status",
+      "destination": "http://54.66.222.189/api/dr-status"
+    },
+    {
+      "source": "/api/:match*",
+      "destination": "http://54.66.222.189/api/:match*"
+    },
+    {
+      "source": "/predict",
+      "destination": "http://54.66.222.189/predict"
+    },
+    {
+      "source": "/healthz",
+      "destination": "http://54.66.222.189/healthz"
+    },
+    {
+      "source": "/readyz",
+      "destination": "http://54.66.222.189/readyz"
+    },
+    {
+      "source": "/app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/:match*",
+      "destination": "/:match*"
+    }
+  ]
+}

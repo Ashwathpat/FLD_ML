@@ -7,13 +7,17 @@
 const AWS_ENDPOINT = "http://54.66.222.189";
 const AZURE_ENDPOINT = "http://20.187.68.47:8000";
 
-let activeBaseUrl = window.location.origin;
-if (activeBaseUrl.includes("localhost") || activeBaseUrl.includes("127.0.0.1")) {
-    activeBaseUrl = "";
-} else if (window.location.hostname === "54.66.222.189") {
-    activeBaseUrl = AWS_ENDPOINT;
-} else if (window.location.hostname === "20.187.68.47") {
-    activeBaseUrl = AZURE_ENDPOINT;
+const isProxied = window.location.origin.includes("localhost:8080") ||
+                  window.location.hostname.includes("vercel.app") ||
+                  window.location.protocol === "https:";
+
+let activeBaseUrl = "";
+if (!isProxied) {
+    if (window.location.hostname === "54.66.222.189") {
+        activeBaseUrl = AWS_ENDPOINT;
+    } else if (window.location.hostname === "20.187.68.47") {
+        activeBaseUrl = AZURE_ENDPOINT;
+    }
 }
 
 // ── Global DR State ─────────────────────────────────────────────────────────
@@ -149,8 +153,10 @@ function updateDRDisplay() {
         currentServingLabel.innerText = "AWS Sydney (Primary)";
         activeRoutePill.className = "active-route-pill";
 
-        if (window.location.hostname !== "20.187.68.47" && !window.location.origin.includes("localhost:8080")) {
+        if (!isProxied && window.location.hostname !== "20.187.68.47") {
             activeBaseUrl = AWS_ENDPOINT;
+        } else if (isProxied) {
+            activeBaseUrl = "";
         }
     } else {
         awsDot.className = "status-indicator offline";
@@ -165,8 +171,10 @@ function updateDRDisplay() {
             currentServingLabel.innerText = "Azure Hong Kong (Failover)";
             activeRoutePill.className = "active-route-pill failover-mode";
 
-            if (!window.location.origin.includes("localhost:8080")) {
+            if (!isProxied) {
                 activeBaseUrl = AZURE_ENDPOINT;
+            } else if (isProxied) {
+                activeBaseUrl = "";
             }
         } else {
             azureDot.className = "status-indicator offline";
