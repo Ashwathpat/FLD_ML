@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.2">
 </head>
 <body>
 
@@ -52,6 +52,11 @@
                     <span class="pulse-ring"></span>
                     <span>Serving via: <strong id="current-serving-cloud">AWS Primary</strong></span>
                 </div>
+
+                <button id="header-aws-power-btn" class="header-power-btn" title="Toggle AWS Primary Power on command">
+                    <span class="power-icon">⚡</span>
+                    <span id="header-power-text">Turn AWS OFF</span>
+                </button>
             </div>
         </header>
 
@@ -282,6 +287,6 @@
         <div class="toast-container" id="toast-container"></div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2.2"></script>
 </body>
 </html>

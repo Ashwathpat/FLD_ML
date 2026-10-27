@@ -77,7 +77,7 @@ def main():
 
     log.info(f"Replicator starting. interval={INTERVAL}s")
 
-    with psycopg.connect(SRC_URL) as src, psycopg.connect(DST_URL) as dst:
+    with psycopg.connect(SRC_URL, autocommit=True) as src, psycopg.connect(DST_URL) as dst:
         while True:
             try:
                 wm = get_watermark(dst)
@@ -97,6 +97,18 @@ def main():
                     log.info(f"Replicated {len(rows)} row(s), new watermark ≈ {rows[-1][2]}")
                 else:
                     log.debug(f"No new rows since {wm}")
+
+                # Bi-directional deletion sync: if rows were deleted from primary, remove from standby
+                src_ids = set(r[0] for r in src.execute("SELECT id FROM predictions").fetchall())
+                dst_ids = set(r[0] for r in dst.execute("SELECT id FROM predictions").fetchall())
+                deleted_ids = dst_ids - src_ids
+                if deleted_ids:
+                    with dst.cursor() as cur:
+                        for did in deleted_ids:
+                            cur.execute("DELETE FROM predictions WHERE id = %s", (did,))
+                    dst.commit()
+                    log.info(f"Synchronized {len(deleted_ids)} deletion(s) to Azure Standby.")
+
                 run_rclone_sync()
             except Exception as exc:
                 log.error(f"Replication cycle error: {exc}")

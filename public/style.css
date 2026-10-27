@@ -283,6 +283,45 @@ body {
     background-color: var(--orange);
 }
 
+/* ── Header Power Toggle Button ────────────────────────────────────── */
+.header-power-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 69, 58, 0.3);
+    background: var(--red-dim);
+    color: #ff6961;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.25s var(--ease);
+    white-space: nowrap;
+}
+
+.header-power-btn:hover {
+    background: rgba(255, 69, 58, 0.2);
+    border-color: var(--red);
+    transform: scale(1.03);
+}
+
+.header-power-btn.aws-off {
+    border-color: rgba(48, 209, 88, 0.3);
+    background: var(--green-dim);
+    color: #5ce0a0;
+}
+
+.header-power-btn.aws-off:hover {
+    background: rgba(48, 209, 88, 0.2);
+    border-color: var(--green);
+}
+
+.power-icon {
+    font-size: 0.85rem;
+}
+
 /* ── Dedicated DR Control Panel & Server Cards ─────────────────────────── */
 .dr-control-panel {
     padding: 1.5rem 2rem;

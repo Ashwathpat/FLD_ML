@@ -114,19 +114,52 @@ function showConfirm(title, message) {
 // ═══════════════════════════════════════════════════════════════════════════
 if (simulateOutageBtn && restorePrimaryBtn) {
     simulateOutageBtn.addEventListener("click", () => {
-        simulatedAwsDown = true;
-        simulateOutageBtn.classList.add("hidden");
-        restorePrimaryBtn.classList.remove("hidden");
-        showToast("⚡ Force Shutdown active! AWS Sydney Primary offline. Traffic auto-failing over to Azure Hong Kong.", "warning");
-        updateDRDisplay();
+        setAwsPower(false);
     });
 
     restorePrimaryBtn.addEventListener("click", () => {
-        simulatedAwsDown = false;
-        restorePrimaryBtn.classList.add("hidden");
-        simulateOutageBtn.classList.remove("hidden");
+        setAwsPower(true);
+    });
+}
+
+// ── Header Quick Power Toggle (single button ON/OFF) ────────────────────
+const headerPowerBtn = document.getElementById("header-aws-power-btn");
+const headerPowerText = document.getElementById("header-power-text");
+
+function setAwsPower(on) {
+    simulatedAwsDown = !on;
+
+    // Sync the DR control panel buttons
+    if (simulateOutageBtn && restorePrimaryBtn) {
+        simulateOutageBtn.classList.toggle("hidden", !on);
+        restorePrimaryBtn.classList.toggle("hidden", on);
+    }
+
+    // Sync the header power button
+    if (headerPowerBtn) {
+        if (on) {
+            headerPowerBtn.classList.remove("aws-off");
+            headerPowerBtn.title = "Click to simulate AWS outage (Force Shutdown)";
+            if (headerPowerText) headerPowerText.textContent = "Turn AWS OFF";
+        } else {
+            headerPowerBtn.classList.add("aws-off");
+            headerPowerBtn.title = "Click to restore AWS Primary route";
+            if (headerPowerText) headerPowerText.textContent = "Turn AWS ON";
+        }
+    }
+
+    if (on) {
         showToast("♻️ AWS Sydney primary route restored. Traffic switched back to AWS Primary.", "success");
-        updateDRDisplay();
+    } else {
+        showToast("⚡ Force Shutdown! AWS Primary offline → auto-failover to Azure Hong Kong.", "warning");
+    }
+
+    updateDRDisplay();
+}
+
+if (headerPowerBtn) {
+    headerPowerBtn.addEventListener("click", () => {
+        setAwsPower(simulatedAwsDown); // toggle: if currently down, turn on; if up, turn off
     });
 }
 
