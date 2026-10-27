@@ -6,9 +6,9 @@ terraform {
       version = "~> 5.0"
     }
   }
-  backend "s3" {
-    # key = "dns/terraform.tfstate"
-  }
+  # backend "s3" {
+  #   key = "dns/terraform.tfstate"
+  # }
 }
 
 provider "aws" {
@@ -46,12 +46,8 @@ resource "aws_route53_record" "primary" {
     type = "PRIMARY"
   }
 
-  alias {
-    name                   = var.aws_ip
-    zone_id                = data.aws_route53_zone.main.zone_id
-    evaluate_target_health = true
-  }
-  ttl = 30
+  records = [var.aws_ip]
+  ttl     = 30
 }
 
 resource "aws_route53_record" "secondary" {

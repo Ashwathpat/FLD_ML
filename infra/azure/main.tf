@@ -6,13 +6,12 @@ terraform {
       version = "~> 3.0"
     }
   }
-  backend "azurerm" {
-    # Populate via terraform init -backend-config=backend.hcl
-    # resource_group_name  = "fld-screen-tfstate"
-    # storage_account_name = "fldscreentfstate"
-    # container_name       = "tfstate"
-    # key                  = "azure/terraform.tfstate"
-  }
+  # backend "azurerm" {
+  #   resource_group_name  = "fld-screen-tfstate"
+  #   storage_account_name = "fldscreentfstate"
+  #   container_name       = "tfstate"
+  #   key                  = "azure/terraform.tfstate"
+  # }
 }
 
 provider "azurerm" {
@@ -118,7 +117,7 @@ resource "azurerm_linux_virtual_machine" "app" {
   name                = "fld-standby"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  size                = "Standard_B1s"
+  size                = "Standard_B2s_v2"
   admin_username      = "deploy"
   custom_data         = filebase64("${path.module}/cloud-init.yaml")
 
@@ -153,8 +152,12 @@ resource "azurerm_postgresql_flexible_server" "pg" {
   storage_mb             = 32768
   administrator_login    = var.db_user
   administrator_password = var.db_password
+  lifecycle {
+    ignore_changes = [zone]
+  }
   tags                   = { project = "fld-screen" }
 }
+
 
 resource "azurerm_postgresql_flexible_server_firewall_rule" "from_aws" {
   name             = "allow-aws-replicator"

@@ -11,6 +11,8 @@ env/
 *.joblib
 *.pkl
 *.h5
+*.sqlite
+*.sqlite3
 
 # Datasets & Large Artifacts
 ml/data/raw/
@@ -40,6 +42,9 @@ cuda/bin/
 # Terraform
 *.tfstate
 *.tfstate.*
+*.tfplan
+tfplan
+*.tar.gz
 .terraform/
 .terraform.lock.hcl
 

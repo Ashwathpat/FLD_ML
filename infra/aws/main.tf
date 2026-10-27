@@ -6,13 +6,12 @@ terraform {
       version = "~> 5.0"
     }
   }
-  backend "s3" {
-    # Populate via terraform init -backend-config=backend.hcl
-    # bucket         = "fld-screen-tfstate"
-    # key            = "aws/terraform.tfstate"
-    # region         = "ap-south-1"
-    # dynamodb_table = "fld-screen-tflock"
-  }
+  # backend "s3" {
+  #   bucket         = "fld-screen-tfstate"
+  #   key            = "aws/terraform.tfstate"
+  #   region         = "ap-south-1"
+  #   dynamodb_table = "fld-screen-tflock"
+  # }
 }
 
 provider "aws" {

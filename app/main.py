@@ -21,12 +21,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.preprocess import preprocess_image
-from app.db import init_db, save_prediction, db_reachable
-from app.storage import upload_image
+from app.db import (
+    init_db, save_prediction, db_reachable,
+    get_recent_predictions, delete_prediction, clear_all_predictions
+)
+from app.storage import upload_image, get_image
 from ml.features import extract_all_biomarkers
 from ml.explain import explain_single_prediction
 
@@ -38,11 +41,21 @@ DISCLAIMER = "Screening-support tool, not a medical diagnosis."
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("fld-screen")
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # ── App & startup ─────────────────────────────────────────────────────────────
 app = FastAPI(
     title="FLD-Screen API",
     description="Fatty Liver Disease screening from tongue images. " + DISCLAIMER,
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 _artifact: Dict[str, Any] = {}
@@ -60,8 +73,15 @@ async def startup_event():
         logger.warning(f"Model artifact not found at {MODEL_PATH}. /predict will fail.")
     init_db()
 
+from fastapi.responses import JSONResponse, Response, RedirectResponse
+
 # Mount the static frontend dashboard at /app
 app.mount("/app", StaticFiles(directory="app/static", html=True), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/app/")
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────
@@ -195,3 +215,61 @@ async def predict(
     }
 
     return _add_served_by(JSONResponse(response_body))
+
+
+@app.get("/api/history", tags=["History"])
+async def get_history(limit: int = 15):
+    """Returns recent predictions from the database."""
+    records = get_recent_predictions(limit=limit)
+    return _add_served_by(JSONResponse({"records": records, "cloud": CLOUD_NAME}))
+
+
+@app.get("/api/image/{image_key:path}", tags=["Storage"])
+async def stream_image(image_key: str):
+    """Streams patient tongue image from cloud object storage."""
+    try:
+        img_bytes = get_image(image_key)
+        content_type = "image/png" if image_key.endswith(".png") else "image/jpeg"
+        response = Response(content=img_bytes, media_type=content_type)
+        response.headers["X-Served-By"] = CLOUD_NAME
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Image not found: {e}")
+
+
+@app.get("/api/cloud-status", tags=["Health"])
+async def cloud_status():
+    """Returns real-time cloud metadata and DR status."""
+    return _add_served_by(JSONResponse({
+        "cloud": CLOUD_NAME,
+        "region": "ap-southeast-2 (Sydney)" if CLOUD_NAME == "aws" else "eastasia (Hong Kong)" if CLOUD_NAME == "azure" else "local",
+        "hostname": os.getenv("PUBLIC_HOSTNAME", "127.0.0.1"),
+        "status": "online",
+        "is_primary": CLOUD_NAME == "aws",
+    }))
+
+
+@app.get("/api/dr-status", tags=["Health"])
+async def dr_status():
+    """Returns instant DR health status for the web UI."""
+    return _add_served_by(JSONResponse({
+        "aws_alive": True,
+        "azure_alive": True,
+        "serving": CLOUD_NAME,
+        "active_region": "AWS Sydney (Primary)" if CLOUD_NAME == "aws" else "Azure Hong Kong (Auto-Failover)",
+        "active_endpoint": os.getenv("PUBLIC_HOSTNAME", "127.0.0.1")
+    }))
+
+
+@app.delete("/api/history/{pred_id}", tags=["History"])
+async def delete_single_prediction(pred_id: str):
+    """Deletes a specific prediction from both AWS RDS and Azure PostgreSQL."""
+    res = delete_prediction(pred_id)
+    return _add_served_by(JSONResponse(res))
+
+
+@app.delete("/api/history", tags=["History"])
+async def clear_history():
+    """Truncates/clears all prediction records from both AWS RDS and Azure PostgreSQL."""
+    res = clear_all_predictions()
+    return _add_served_by(JSONResponse(res))

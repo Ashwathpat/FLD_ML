@@ -8,6 +8,7 @@ Runs on the AWS VM. Every INTERVAL_SECONDS it:
 """
 import os
 import time
+import json
 import subprocess
 import logging
 
@@ -82,7 +83,16 @@ def main():
                 wm = get_watermark(dst)
                 rows = src.execute(SELECT_SQL, (wm,)).fetchall()
                 if rows:
-                    dst.executemany(UPSERT_SQL, rows)
+                    payload = [
+                        (
+                            r[0], r[1], r[2], r[3], r[4],
+                            json.dumps(r[5]) if isinstance(r[5], (dict, list)) else r[5],
+                            json.dumps(r[6]) if isinstance(r[6], (dict, list)) else r[6],
+                        )
+                        for r in rows
+                    ]
+                    with dst.cursor() as cur:
+                        cur.executemany(UPSERT_SQL, payload)
                     dst.commit()
                     log.info(f"Replicated {len(rows)} row(s), new watermark ≈ {rows[-1][2]}")
                 else:

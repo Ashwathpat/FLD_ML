@@ -1,0 +1,4 @@
+domain        = "fld-screen.example.com"
+aws_ip        = "54.210.12.34"
+azure_ip      = "20.120.45.67"
+sns_topic_arn = "arn:aws:sns:us-east-1:123456789012:fld-alerts"

@@ -1,0 +1,21 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+
+runcmd:
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  - echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - id -u deploy &>/dev/null && usermod -aG docker deploy || true
+  - id -u ubuntu &>/dev/null && usermod -aG docker ubuntu || true
+  - systemctl enable docker
+  - systemctl start docker
+  - mkdir -p /opt/fld
+  - chown -R deploy:deploy /opt/fld 2>/dev/null || chown -R ubuntu:ubuntu /opt/fld 2>/dev/null || true

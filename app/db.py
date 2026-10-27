@@ -107,3 +107,90 @@ def db_reachable() -> bool:
         return False
     finally:
         conn.close()
+
+
+def get_recent_predictions(limit: int = 10):
+    """Fetches recent prediction records with timestamps, keys, and labels."""
+    conn = get_connection()
+    if conn is None:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, created_at, image_key, label, probs, features
+                FROM predictions
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (limit,)
+            )
+            rows = cur.fetchall()
+            results = []
+            for r in rows:
+                results.append({
+                    "id": str(r[0]),
+                    "created_at": r[1].isoformat() if r[1] else "",
+                    "image_key": r[2],
+                    "label": r[3],
+                    "probs": r[4] if isinstance(r[4], dict) else json.loads(r[4]) if r[4] else {},
+                    "features": r[5] if isinstance(r[5], dict) else json.loads(r[5]) if r[5] else {},
+                })
+            return results
+    except Exception as e:
+        print(f"[db.py] get_recent_predictions error: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def get_all_db_urls() -> list:
+    """Returns all available cloud database URLs (AWS RDS + Azure PG)."""
+    urls = []
+    for var in ["DATABASE_URL", "TARGET_DATABASE_URL", "SOURCE_DATABASE_URL"]:
+        val = os.getenv(var)
+        if val and val not in urls:
+            urls.append(val)
+    # Ensure both AWS RDS and Azure Standby URLs are present
+    aws_rds = "postgresql://fld_user:FldSecurePass2026!@fld-pg.cj4y80kwm16d.ap-southeast-2.rds.amazonaws.com:5432/fld_db"
+    azure_pg = "postgresql://fld_user:FldSecurePass2026!@fld-pg-standby-fld01.postgres.database.azure.com:5432/fld_db?sslmode=require"
+    if aws_rds not in urls:
+        urls.append(aws_rds)
+    if azure_pg not in urls:
+        urls.append(azure_pg)
+    return urls
+
+
+def delete_prediction(pred_id: str) -> dict:
+    """Deletes a prediction record by UUID across BOTH AWS and Azure databases."""
+    deleted_from = []
+    errors = []
+    for url in get_all_db_urls():
+        try:
+            with psycopg.connect(url, connect_timeout=4) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM predictions WHERE id = %s", (pred_id,))
+                conn.commit()
+                # Extract clean hostname
+                host = url.split("@")[-1].split("/")[0]
+                deleted_from.append(host)
+        except Exception as e:
+            errors.append(f"{url.split('@')[-1].split('/')[0]}: {e}")
+    return {"deleted_id": pred_id, "targets": deleted_from, "errors": errors}
+
+
+def clear_all_predictions() -> dict:
+    """Deletes ALL records across BOTH AWS and Azure databases."""
+    cleared_from = []
+    errors = []
+    for url in get_all_db_urls():
+        try:
+            with psycopg.connect(url, connect_timeout=4) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("TRUNCATE TABLE predictions")
+                conn.commit()
+                host = url.split("@")[-1].split("/")[0]
+                cleared_from.append(host)
+        except Exception as e:
+            errors.append(f"{url.split('@')[-1].split('/')[0]}: {e}")
+    return {"status": "all_cleared", "targets": cleared_from, "errors": errors}

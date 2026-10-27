@@ -14,6 +14,7 @@ COPY ml/ ./ml/
 COPY ml/artifacts/model.joblib ./model.joblib
 ENV MODEL_PATH=/srv/model.joblib
 ENV PREPROC_BACKEND=cpu
+RUN mkdir -p /srv/ml/data/uploads && chown -R app:app /srv
 USER app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s CMD \
   python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"
