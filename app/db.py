@@ -173,23 +173,28 @@ def get_all_db_urls() -> list:
 
 
 def delete_prediction(pred_id: str) -> dict:
-    """Deletes a prediction record by UUID across BOTH AWS and Azure databases."""
+    """Deletes a prediction record by UUID across BOTH AWS and Azure databases and returns image_key."""
     deleted_from = []
     errors = []
     row_found = False
+    image_key = None
     for url in get_all_db_urls():
         try:
             with psycopg.connect(url, connect_timeout=2.5) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("DELETE FROM predictions WHERE id = %s", (pred_id,))
-                    if cur.rowcount > 0:
+                    cur.execute("DELETE FROM predictions WHERE id = %s RETURNING image_key", (pred_id,))
+                    row = cur.fetchone()
+                    if row:
                         row_found = True
+                        if row[0]:
+                            image_key = row[0]
                 conn.commit()
                 host = url.split("@")[-1].split("/")[0]
                 deleted_from.append(host)
         except Exception as e:
             errors.append(f"{url.split('@')[-1].split('/')[0]}: {e}")
-    return {"deleted_id": pred_id, "found": row_found, "targets": deleted_from, "errors": errors}
+    return {"deleted_id": pred_id, "found": row_found, "image_key": image_key, "targets": deleted_from, "errors": errors}
+
 
 
 def clear_all_predictions() -> dict:

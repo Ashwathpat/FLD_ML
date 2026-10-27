@@ -29,7 +29,7 @@ from app.db import (
     init_db, save_prediction, db_reachable,
     get_recent_predictions, delete_prediction, clear_all_predictions
 )
-from app.storage import upload_image, get_image
+from app.storage import upload_image, get_image, delete_image, purge_all_images
 from ml.features import extract_all_biomarkers
 from ml.explain import explain_single_prediction
 
@@ -263,13 +263,18 @@ async def dr_status():
 
 @app.delete("/api/history/{pred_id}", tags=["History"])
 async def delete_single_prediction(pred_id: str):
-    """Deletes a specific prediction from both AWS RDS and Azure PostgreSQL."""
+    """Deletes a specific prediction from both AWS RDS and Azure PostgreSQL, and removes its image from object storage."""
     res = delete_prediction(pred_id)
+    if res.get("image_key"):
+        delete_image(res["image_key"])
     return _add_served_by(JSONResponse(res))
 
 
 @app.delete("/api/history", tags=["History"])
 async def clear_history():
-    """Truncates/clears all prediction records from both AWS RDS and Azure PostgreSQL."""
+    """Truncates/clears all prediction records from both AWS RDS and Azure PostgreSQL, and purges all uploaded images."""
     res = clear_all_predictions()
+    purged_images = purge_all_images()
+    res["purged_images"] = purged_images
     return _add_served_by(JSONResponse(res))
+
