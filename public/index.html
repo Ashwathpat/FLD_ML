@@ -55,6 +55,108 @@
             </div>
         </header>
 
+        <!-- Dedicated Multi-Cloud Infrastructure & DR Control Center -->
+        <section class="glass-panel dr-control-panel">
+            <div class="dr-panel-header">
+                <div class="dr-panel-title">
+                    <span class="pulse-icon">⚡</span>
+                    <div>
+                        <h3>Multi-Cloud High-Availability & Disaster Recovery System</h3>
+                        <p>Real-time cross-cloud active-standby topology (AWS Sydney ⇄ Azure Hong Kong)</p>
+                    </div>
+                </div>
+                <div class="dr-controls">
+                    <button id="simulate-outage-btn" class="dr-action-btn warning-btn" title="Simulate AWS outage to trigger instant failover">
+                        💥 Simulate AWS Outage
+                    </button>
+                    <button id="restore-primary-btn" class="dr-action-btn success-btn hidden" title="Restore AWS primary server">
+                        ♻️ Restore AWS Primary
+                    </button>
+                </div>
+            </div>
+
+            <div class="dr-servers-grid">
+                <!-- AWS Primary Card -->
+                <div class="dr-server-card primary-server" id="card-aws">
+                    <div class="server-card-header">
+                        <div class="server-brand">
+                            <span class="server-icon">☁️</span>
+                            <div>
+                                <h4>AWS Sydney — Primary</h4>
+                                <span class="server-endpoint">54.66.222.189 &bull; ap-southeast-2</span>
+                            </div>
+                        </div>
+                        <span class="server-status-pill online" id="card-aws-status">ACTIVE PRIMARY</span>
+                    </div>
+                    <div class="server-card-metrics">
+                        <div class="metric-item">
+                            <small>Compute</small>
+                            <span>EC2 t3.small</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Database</small>
+                            <span>PostgreSQL RDS</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Storage</small>
+                            <span>AWS S3</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Latency</small>
+                            <span id="aws-latency">-- ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sync Bridge -->
+                <div class="dr-sync-bridge">
+                    <div class="sync-arrows">⇄</div>
+                    <div class="sync-label">
+                        <strong>CDC Sync</strong>
+                        <small>RPO &lt; 5s</small>
+                    </div>
+                </div>
+
+                <!-- Azure Standby Card -->
+                <div class="dr-server-card standby-server" id="card-azure">
+                    <div class="server-card-header">
+                        <div class="server-brand">
+                            <span class="server-icon">🔷</span>
+                            <div>
+                                <h4>Azure East Asia — Standby</h4>
+                                <span class="server-endpoint">20.187.68.47:8000 &bull; Hong Kong</span>
+                            </div>
+                        </div>
+                        <span class="server-status-pill standby" id="card-azure-status">HOT STANDBY</span>
+                    </div>
+                    <div class="server-card-metrics">
+                        <div class="metric-item">
+                            <small>Compute</small>
+                            <span>Azure VM B1s</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Database</small>
+                            <span>Azure Flexible Server</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Storage</small>
+                            <span>Azure Blob</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Latency</small>
+                            <span id="azure-latency">-- ms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Traffic Routing Banner -->
+            <div class="routing-alert-banner" id="routing-banner">
+                <span class="traffic-beacon" id="routing-beacon"></span>
+                <span>Active Routing: All screening requests currently served by <strong id="routing-target-text">AWS Sydney (Primary)</strong>. Zero Data Loss Guaranteed.</span>
+            </div>
+        </section>
+
         <!-- Main Workspace -->
         <main class="content-grid">
             <!-- Left Panel: Patient Clinical Input & Image -->

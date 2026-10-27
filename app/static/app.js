@@ -97,61 +97,122 @@ function showConfirm(title, message) {
     });
 }
 
+let simulatedAwsDown = false;
+
+// ── Multi-Cloud Control Panel DOM Cache ─────────────────────────────────────
+const cardAws = document.getElementById("card-aws");
+const cardAwsStatus = document.getElementById("card-aws-status");
+const awsLatencyEl = document.getElementById("aws-latency");
+const cardAzure = document.getElementById("card-azure");
+const cardAzureStatus = document.getElementById("card-azure-status");
+const azureLatencyEl = document.getElementById("azure-latency");
+const routingBanner = document.getElementById("routing-banner");
+const routingTargetText = document.getElementById("routing-target-text");
+const simulateOutageBtn = document.getElementById("simulate-outage-btn");
+const restorePrimaryBtn = document.getElementById("restore-primary-btn");
+
+if (simulateOutageBtn && restorePrimaryBtn) {
+    simulateOutageBtn.addEventListener("click", () => {
+        simulatedAwsDown = true;
+        simulateOutageBtn.classList.add("hidden");
+        restorePrimaryBtn.classList.remove("hidden");
+        showToast("⚠️ Outage simulated! AWS Sydney taken down. Auto-failing over to Azure Standby.", "info");
+        updateDRDisplay();
+    });
+
+    restorePrimaryBtn.addEventListener("click", () => {
+        simulatedAwsDown = false;
+        restorePrimaryBtn.classList.add("hidden");
+        simulateOutageBtn.classList.remove("hidden");
+        showToast("♻️ AWS Sydney restored! Primary route recovered.", "success");
+        updateDRDisplay();
+    });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  MULTI-CLOUD HEALTH MONITOR & AUTO-FAILOVER
 // ═══════════════════════════════════════════════════════════════════════════
 async function probeCloudHealth() {
-    try {
-        const res = await fetch("/api/dr-status");
-        if (res.ok) {
-            const data = await res.json();
-            awsAlive = Boolean(data.aws_alive);
-            azureAlive = Boolean(data.azure_alive);
-            updateDRDisplay();
-            if (data.active_region) currentServingLabel.innerText = data.active_region;
-            return;
-        }
-    } catch (e) { /* fallback below */ }
+    if (simulatedAwsDown) {
+        awsAlive = false;
+        azureAlive = true;
+        updateDRDisplay();
+        return;
+    }
 
-    // Direct probe fallback
+    // Measure AWS Latency
     try {
+        const t0 = performance.now();
         const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 2000);
+        const t = setTimeout(() => c.abort(), 2500);
         const r = await fetch(`${AWS_ENDPOINT}/healthz`, { signal: c.signal, mode: "cors" });
         clearTimeout(t);
         awsAlive = r.ok;
-    } catch (e) { awsAlive = false; }
+        if (awsLatencyEl) awsLatencyEl.innerText = `${Math.round(performance.now() - t0)} ms`;
+    } catch (e) {
+        awsAlive = false;
+        if (awsLatencyEl) awsLatencyEl.innerText = "Timeout";
+    }
 
+    // Measure Azure Latency
     try {
+        const t0 = performance.now();
         const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 2000);
+        const t = setTimeout(() => c.abort(), 2500);
         const r = await fetch(`${AZURE_ENDPOINT}/healthz`, { signal: c.signal, mode: "cors" });
         clearTimeout(t);
         azureAlive = r.ok;
-    } catch (e) { azureAlive = false; }
+        if (azureLatencyEl) azureLatencyEl.innerText = `${Math.round(performance.now() - t0)} ms`;
+    } catch (e) {
+        azureAlive = false;
+        if (azureLatencyEl) azureLatencyEl.innerText = "Timeout";
+    }
 
     updateDRDisplay();
 }
 
 function updateDRDisplay() {
-    if (awsAlive) {
+    const isAwsActive = !simulatedAwsDown && awsAlive;
+
+    if (isAwsActive) {
+        // AWS is live & serving
         awsDot.className = "status-indicator live";
         awsState.innerText = "ONLINE";
         awsBadge.className = "cloud-badge active-cloud";
+        if (cardAws) {
+            cardAws.classList.remove("offline-server");
+            cardAwsStatus.className = "server-status-pill online";
+            cardAwsStatus.innerText = "ACTIVE PRIMARY";
+        }
 
         if (azureAlive) {
             azureDot.className = "status-indicator standby";
             azureState.innerText = "HOT STANDBY";
             azureBadge.className = "cloud-badge";
+            if (cardAzure) {
+                cardAzure.classList.remove("active-server");
+                cardAzureStatus.className = "server-status-pill standby";
+                cardAzureStatus.innerText = "HOT STANDBY";
+            }
         } else {
             azureDot.className = "status-indicator offline";
             azureState.innerText = "OFFLINE";
             azureBadge.className = "cloud-badge offline-cloud";
+            if (cardAzure) {
+                cardAzure.classList.remove("active-server");
+                cardAzureStatus.className = "server-status-pill offline";
+                cardAzureStatus.innerText = "OFFLINE";
+            }
         }
 
         currentServingCloud = "aws";
         currentServingLabel.innerText = "AWS Sydney (Primary)";
         activeRoutePill.className = "active-route-pill";
+
+        if (routingBanner) {
+            routingBanner.classList.remove("failover-active");
+            routingTargetText.innerText = "AWS Sydney (Primary)";
+        }
 
         if (!isProxied && window.location.hostname !== "20.187.68.47") {
             activeBaseUrl = AWS_ENDPOINT;
@@ -159,9 +220,15 @@ function updateDRDisplay() {
             activeBaseUrl = "";
         }
     } else {
+        // AWS is down or simulated outage -> Failover to Azure
         awsDot.className = "status-indicator offline";
-        awsState.innerText = "OFFLINE";
+        awsState.innerText = simulatedAwsDown ? "SIMULATED OUTAGE" : "OFFLINE";
         awsBadge.className = "cloud-badge offline-cloud";
+        if (cardAws) {
+            cardAws.classList.add("offline-server");
+            cardAwsStatus.className = "server-status-pill offline";
+            cardAwsStatus.innerText = simulatedAwsDown ? "SIMULATED OUTAGE" : "OFFLINE";
+        }
 
         if (azureAlive) {
             azureDot.className = "status-indicator failover";
@@ -171,20 +238,28 @@ function updateDRDisplay() {
             currentServingLabel.innerText = "Azure Hong Kong (Failover)";
             activeRoutePill.className = "active-route-pill failover-mode";
 
-            if (!isProxied) {
-                activeBaseUrl = AZURE_ENDPOINT;
-            } else if (isProxied) {
-                activeBaseUrl = "";
+            if (cardAzure) {
+                cardAzure.classList.add("active-server");
+                cardAzureStatus.className = "server-status-pill online";
+                cardAzureStatus.innerText = "ACTIVE (FAILOVER)";
             }
+
+            if (routingBanner) {
+                routingBanner.classList.add("failover-active");
+                routingTargetText.innerText = "Azure East Asia (Auto-Failover Active)";
+            }
+
+            activeBaseUrl = AZURE_ENDPOINT;
         } else {
             azureDot.className = "status-indicator offline";
             azureState.innerText = "OFFLINE";
             currentServingLabel.innerText = "ALL CLOUDS UNREACHABLE";
+            if (routingBanner) routingTargetText.innerText = "NONE (All Servers Down)";
         }
     }
 }
 
-setInterval(probeCloudHealth, 3000);
+setInterval(probeCloudHealth, 4000);
 probeCloudHealth();
 
 // ═══════════════════════════════════════════════════════════════════════════
