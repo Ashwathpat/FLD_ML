@@ -224,9 +224,16 @@ predictForm.addEventListener("submit", async (e) => {
 
     try {
         let response;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout to prevent hang
         try {
-            response = await fetch(targetUrl, { method: "POST", body: formData });
+            response = await fetch(targetUrl, { method: "POST", body: formData, signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
         } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            console.warn("Primary endpoint timed out or failed. Failing over to Azure Standby:", fetchErr);
+            showToast("Primary busy. Auto-failing over to Azure Standby...", "info");
             targetUrl = `${AZURE_ENDPOINT}/predict`;
             response = await fetch(targetUrl, { method: "POST", body: formData });
             probeCloudHealth();

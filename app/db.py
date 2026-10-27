@@ -31,12 +31,13 @@ CREATE INDEX IF NOT EXISTS idx_predictions_updated ON predictions (updated_at);
 """
 
 
-def get_connection():
+def get_connection(db_url: Optional[str] = None):
     """Returns a psycopg connection, or None if DB is unavailable."""
-    if not PSYCOPG_AVAILABLE or not DATABASE_URL:
+    url = db_url or DATABASE_URL
+    if not PSYCOPG_AVAILABLE or not url:
         return None
     try:
-        return psycopg.connect(DATABASE_URL)
+        return psycopg.connect(url, connect_timeout=3)
     except Exception as e:
         print(f"[db.py] DB connection failed: {e}")
         return None
