@@ -3,6 +3,38 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/aws/healthz",
+      "destination": "http://54.66.222.189/healthz"
+    },
+    {
+      "source": "/api/aws/readyz",
+      "destination": "http://54.66.222.189/readyz"
+    },
+    {
+      "source": "/api/aws/predict",
+      "destination": "http://54.66.222.189/predict"
+    },
+    {
+      "source": "/api/aws/:path*",
+      "destination": "http://54.66.222.189/:path*"
+    },
+    {
+      "source": "/api/azure/healthz",
+      "destination": "http://20.187.68.47:8000/healthz"
+    },
+    {
+      "source": "/api/azure/readyz",
+      "destination": "http://20.187.68.47:8000/readyz"
+    },
+    {
+      "source": "/api/azure/predict",
+      "destination": "http://20.187.68.47:8000/predict"
+    },
+    {
+      "source": "/api/azure/:path*",
+      "destination": "http://20.187.68.47:8000/:path*"
+    },
+    {
       "source": "/api/dr-status",
       "destination": "http://54.66.222.189/api/dr-status"
     },
@@ -23,6 +55,14 @@
       "destination": "http://54.66.222.189/readyz"
     },
     {
+      "source": "/app/style.css",
+      "destination": "/style.css"
+    },
+    {
+      "source": "/app/app.js",
+      "destination": "/app.js"
+    },
+    {
       "source": "/app",
       "destination": "/index.html"
     },
@@ -33,6 +73,10 @@
     {
       "source": "/app/:match*",
       "destination": "/:match*"
+    },
+    {
+      "source": "/",
+      "destination": "/index.html"
     }
   ]
 }

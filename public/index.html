@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/app/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -66,11 +66,11 @@
                     </div>
                 </div>
                 <div class="dr-controls">
-                    <button id="simulate-outage-btn" class="dr-action-btn warning-btn" title="Simulate AWS outage to trigger instant failover">
-                        💥 Simulate AWS Outage
+                    <button id="simulate-outage-btn" class="dr-action-btn warning-btn" title="Simulate AWS outage to trigger instant auto-failover to Azure">
+                        ⚡ Force Shutdown AWS (Simulate Outage)
                     </button>
-                    <button id="restore-primary-btn" class="dr-action-btn success-btn hidden" title="Restore AWS primary server">
-                        ♻️ Restore AWS Primary
+                    <button id="restore-primary-btn" class="dr-action-btn success-btn hidden" title="Restore AWS primary server route">
+                        ♻️ Restore AWS Primary Route
                     </button>
                 </div>
             </div>
@@ -282,6 +282,6 @@
         <div class="toast-container" id="toast-container"></div>
     </div>
 
-    <script src="/app/app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

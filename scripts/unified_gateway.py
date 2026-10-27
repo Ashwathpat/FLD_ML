@@ -123,9 +123,18 @@ class DRReverseProxyHandler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
-        with LOCK:
-            target = CURRENT_ACTIVE_TARGET
-            is_failover = not AWS_IS_ALIVE
+        if path.startswith("/api/aws"):
+            target = AWS_PRIMARY
+            path = path[len("/api/aws"):] or "/"
+            is_failover = False
+        elif path.startswith("/api/azure"):
+            target = AZURE_STANDBY
+            path = path[len("/api/azure"):] or "/"
+            is_failover = True
+        else:
+            with LOCK:
+                target = CURRENT_ACTIVE_TARGET
+                is_failover = not AWS_IS_ALIVE
 
         target_url = f"{target}{path}"
 

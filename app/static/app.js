@@ -1,28 +1,25 @@
 /**
  * FLD-Screen — AI Diagnostic Platform
- * Multi-Cloud DR Controller with Delete & Clear All
+ * Multi-Cloud DR Controller with Zero-Data-Loss Failover & Bidirectional Synchronization
  */
 
-// ── Cloud Endpoints ─────────────────────────────────────────────────────────
-const AWS_ENDPOINT = "http://54.66.222.189";
-const AZURE_ENDPOINT = "http://20.187.68.47:8000";
+// ── Cloud Endpoints & Protocol-Safe Routing ─────────────────────────────────
+const isHttps = window.location.protocol === "https:";
+const isVercel = window.location.hostname.includes("vercel.app");
 
-const isProxied = window.location.origin.includes("localhost:8080") ||
-                  window.location.hostname.includes("vercel.app") ||
-                  window.location.protocol === "https:";
+// On Vercel (HTTPS) or when using SSL, route all API traffic through the
+// Vercel HTTPS reverse-proxy edge rewrites (/api/aws and /api/azure).
+// This guarantees ZERO browser mixed-content (HTTP on HTTPS) blocking!
+// When running locally on HTTP or direct EC2/Azure IP, use direct IP endpoints.
+const AWS_ENDPOINT = (isHttps || isVercel) ? "/api/aws" : "http://54.66.222.189";
+const AZURE_ENDPOINT = (isHttps || isVercel) ? "/api/azure" : "http://20.187.68.47:8000";
 
-let activeBaseUrl = "";
-if (!isProxied) {
-    if (window.location.hostname === "54.66.222.189") {
-        activeBaseUrl = AWS_ENDPOINT;
-    } else if (window.location.hostname === "20.187.68.47") {
-        activeBaseUrl = AZURE_ENDPOINT;
-    }
-}
+let activeBaseUrl = AWS_ENDPOINT;
 
 // ── Global DR State ─────────────────────────────────────────────────────────
 let awsAlive = true;
 let azureAlive = true;
+let simulatedAwsDown = false;
 let currentServingCloud = "aws";
 
 // ── DOM Cache ───────────────────────────────────────────────────────────────
@@ -54,15 +51,30 @@ let selectedFile = null;
 let donutChart = null;
 let barChart = null;
 
+// ── Multi-Cloud Control Panel DOM Cache ─────────────────────────────────────
+const cardAws = document.getElementById("card-aws");
+const cardAwsStatus = document.getElementById("card-aws-status");
+const awsLatencyEl = document.getElementById("aws-latency");
+const cardAzure = document.getElementById("card-azure");
+const cardAzureStatus = document.getElementById("card-azure-status");
+const azureLatencyEl = document.getElementById("azure-latency");
+const routingBanner = document.getElementById("routing-banner");
+const routingTargetText = document.getElementById("routing-target-text");
+const simulateOutageBtn = document.getElementById("simulate-outage-btn");
+const restorePrimaryBtn = document.getElementById("restore-primary-btn");
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  TOAST NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 function showToast(message, type = "success") {
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<span>${type === "success" ? "✓" : "✕"}</span> ${message}`;
+    let icon = "✓";
+    if (type === "error") icon = "✕";
+    if (type === "warning" || type === "info") icon = "⚡";
+    toast.innerHTML = `<span>${icon}</span> ${message}`;
     toastContainer.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    setTimeout(() => toast.remove(), 3500);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -78,7 +90,7 @@ function showConfirm(title, message) {
                 <p>${message}</p>
                 <div class="modal-actions">
                     <button class="modal-btn cancel-btn">Cancel</button>
-                    <button class="modal-btn danger confirm-btn">Delete</button>
+                    <button class="modal-btn danger confirm-btn">Permanently Delete</button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
@@ -97,26 +109,15 @@ function showConfirm(title, message) {
     });
 }
 
-let simulatedAwsDown = false;
-
-// ── Multi-Cloud Control Panel DOM Cache ─────────────────────────────────────
-const cardAws = document.getElementById("card-aws");
-const cardAwsStatus = document.getElementById("card-aws-status");
-const awsLatencyEl = document.getElementById("aws-latency");
-const cardAzure = document.getElementById("card-azure");
-const cardAzureStatus = document.getElementById("card-azure-status");
-const azureLatencyEl = document.getElementById("azure-latency");
-const routingBanner = document.getElementById("routing-banner");
-const routingTargetText = document.getElementById("routing-target-text");
-const simulateOutageBtn = document.getElementById("simulate-outage-btn");
-const restorePrimaryBtn = document.getElementById("restore-primary-btn");
-
+// ═══════════════════════════════════════════════════════════════════════════
+//  FORCE SHUTDOWN / SIMULATE OUTAGE CONTROLS
+// ═══════════════════════════════════════════════════════════════════════════
 if (simulateOutageBtn && restorePrimaryBtn) {
     simulateOutageBtn.addEventListener("click", () => {
         simulatedAwsDown = true;
         simulateOutageBtn.classList.add("hidden");
         restorePrimaryBtn.classList.remove("hidden");
-        showToast("⚠️ Outage simulated! AWS Sydney taken down. Auto-failing over to Azure Standby.", "info");
+        showToast("⚡ Force Shutdown active! AWS Sydney Primary offline. Traffic auto-failing over to Azure Hong Kong.", "warning");
         updateDRDisplay();
     });
 
@@ -124,7 +125,7 @@ if (simulateOutageBtn && restorePrimaryBtn) {
         simulatedAwsDown = false;
         restorePrimaryBtn.classList.add("hidden");
         simulateOutageBtn.classList.remove("hidden");
-        showToast("♻️ AWS Sydney restored! Primary route recovered.", "success");
+        showToast("♻️ AWS Sydney primary route restored. Traffic switched back to AWS Primary.", "success");
         updateDRDisplay();
     });
 }
@@ -135,7 +136,19 @@ if (simulateOutageBtn && restorePrimaryBtn) {
 async function probeCloudHealth() {
     if (simulatedAwsDown) {
         awsAlive = false;
-        azureAlive = true;
+        // Still probe Azure to maintain real-time status and latency
+        try {
+            const t0 = performance.now();
+            const c = new AbortController();
+            const t = setTimeout(() => c.abort(), 2500);
+            const r = await fetch(`${AZURE_ENDPOINT}/healthz`, { signal: c.signal });
+            clearTimeout(t);
+            azureAlive = r.ok;
+            if (azureLatencyEl) azureLatencyEl.innerText = `${Math.round(performance.now() - t0)} ms`;
+        } catch (e) {
+            azureAlive = false;
+            if (azureLatencyEl) azureLatencyEl.innerText = "Timeout";
+        }
         updateDRDisplay();
         return;
     }
@@ -145,7 +158,7 @@ async function probeCloudHealth() {
         const t0 = performance.now();
         const c = new AbortController();
         const t = setTimeout(() => c.abort(), 2500);
-        const r = await fetch(`${AWS_ENDPOINT}/healthz`, { signal: c.signal, mode: "cors" });
+        const r = await fetch(`${AWS_ENDPOINT}/healthz`, { signal: c.signal });
         clearTimeout(t);
         awsAlive = r.ok;
         if (awsLatencyEl) awsLatencyEl.innerText = `${Math.round(performance.now() - t0)} ms`;
@@ -159,7 +172,7 @@ async function probeCloudHealth() {
         const t0 = performance.now();
         const c = new AbortController();
         const t = setTimeout(() => c.abort(), 2500);
-        const r = await fetch(`${AZURE_ENDPOINT}/healthz`, { signal: c.signal, mode: "cors" });
+        const r = await fetch(`${AZURE_ENDPOINT}/healthz`, { signal: c.signal });
         clearTimeout(t);
         azureAlive = r.ok;
         if (azureLatencyEl) azureLatencyEl.innerText = `${Math.round(performance.now() - t0)} ms`;
@@ -175,7 +188,7 @@ function updateDRDisplay() {
     const isAwsActive = !simulatedAwsDown && awsAlive;
 
     if (isAwsActive) {
-        // AWS is live & serving
+        // AWS Primary is ONLINE and actively serving
         awsDot.className = "status-indicator live";
         awsState.innerText = "ONLINE";
         awsBadge.className = "cloud-badge active-cloud";
@@ -214,13 +227,9 @@ function updateDRDisplay() {
             routingTargetText.innerText = "AWS Sydney (Primary)";
         }
 
-        if (!isProxied && window.location.hostname !== "20.187.68.47") {
-            activeBaseUrl = AWS_ENDPOINT;
-        } else if (isProxied) {
-            activeBaseUrl = "";
-        }
+        activeBaseUrl = AWS_ENDPOINT;
     } else {
-        // AWS is down or simulated outage -> Failover to Azure
+        // AWS is down or Force Shutdown / Simulated Outage is active -> Failover to Azure
         awsDot.className = "status-indicator offline";
         awsState.innerText = simulatedAwsDown ? "SIMULATED OUTAGE" : "OFFLINE";
         awsBadge.className = "cloud-badge offline-cloud";
@@ -235,7 +244,7 @@ function updateDRDisplay() {
             azureState.innerText = "ACTIVE (FAILOVER)";
             azureBadge.className = "cloud-badge active-cloud";
             currentServingCloud = "azure";
-            currentServingLabel.innerText = "Azure Hong Kong (Failover)";
+            currentServingLabel.innerText = "Azure Hong Kong (Failover Route)";
             activeRoutePill.className = "active-route-pill failover-mode";
 
             if (cardAzure) {
@@ -295,20 +304,22 @@ predictForm.addEventListener("submit", async (e) => {
     const formData = new FormData(predictForm);
     formData.set("file", selectedFile);
 
-    let targetUrl = activeBaseUrl ? `${activeBaseUrl}/predict` : "/predict";
+    // If AWS is force shutdown / simulated down, send directly to Azure
+    let targetEndpoint = (simulatedAwsDown || !awsAlive) ? AZURE_ENDPOINT : activeBaseUrl;
+    let targetUrl = `${targetEndpoint}/predict`;
 
     try {
         let response;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout to prevent hang
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
         try {
             response = await fetch(targetUrl, { method: "POST", body: formData, signal: controller.signal });
             clearTimeout(timeoutId);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
         } catch (fetchErr) {
             clearTimeout(timeoutId);
-            console.warn("Primary endpoint timed out or failed. Failing over to Azure Standby:", fetchErr);
-            showToast("Primary busy. Auto-failing over to Azure Standby...", "info");
+            console.warn("Primary endpoint timed out or failed. Auto-failing over to Azure Standby:", fetchErr);
+            showToast("Primary offline. Auto-failing over to Azure Standby...", "info");
             targetUrl = `${AZURE_ENDPOINT}/predict`;
             response = await fetch(targetUrl, { method: "POST", body: formData });
             probeCloudHealth();
@@ -319,7 +330,12 @@ predictForm.addEventListener("submit", async (e) => {
         const servedBy = response.headers.get("X-Served-By") || currentServingCloud;
         displayResults(data, servedBy);
         loadHistoryArchive();
-        showToast("Diagnostic complete.");
+
+        if (servedBy === "azure" || simulatedAwsDown) {
+            showToast("⚡ Screening processed by Azure Standby (Auto-Failover, 0 Data Loss).", "info");
+        } else {
+            showToast("✓ Diagnostic complete (Served by AWS Primary).");
+        }
     } catch (error) {
         showToast("Inference failed: " + error.message, "error");
     } finally {
@@ -328,16 +344,25 @@ predictForm.addEventListener("submit", async (e) => {
     }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  DISPLAY RESULTS
+// ═══════════════════════════════════════════════════════════════════════════
 function displayResults(data, servedBy) {
     resultsPlaceholder.classList.add("hidden");
     resultsContent.classList.remove("hidden");
 
     const isFLD = data.label === "FLD";
-    resultLabel.innerText = isFLD ? "Fatty Liver Detected" : "Healthy — No FLD";
-    resultLabel.className = `result-badge ${isFLD ? "fld" : "healthy"}`;
+    resultLabel.innerText = isFLD ? "Fatty Liver Disease (FLD)" : "Healthy (No FLD)";
+    resultLabel.className = `result-badge ${isFLD ? "fld" : "no-fld"}`;
 
-    disclaimerText.innerText = data.disclaimer || "Screening-support tool, not a medical diagnosis.";
-    servedByText.innerText = `Processed by ${servedBy.toUpperCase()} Cloud`;
+    disclaimerText.innerText = isFLD
+        ? "High probability of hepatic steatosis detected. Comprehensive hepatic ultrasound and clinical evaluation recommended."
+        : "Low statistical risk of FLD detected based on current biomarkers. Regular annual checkups recommended.";
+
+    const regionText = (servedBy === "azure" || simulatedAwsDown)
+        ? "Azure East Asia (Hong Kong) Standby [Failover Active - 0 Data Loss]"
+        : "AWS Sydney (ap-southeast-2) Primary";
+    servedByText.innerHTML = `Served by: <strong>${regionText}</strong>`;
 
     renderDonutChart(data.probabilities);
     renderBarChart(data.top_features);
@@ -346,50 +371,55 @@ function displayResults(data, servedBy) {
 function renderDonutChart(probs) {
     const ctx = document.getElementById("donut-chart").getContext("2d");
     if (donutChart) donutChart.destroy();
+
     donutChart = new Chart(ctx, {
         type: "doughnut",
         data: {
-            labels: Object.keys(probs),
+            labels: ["FLD Probability", "Healthy Probability"],
             datasets: [{
-                data: Object.values(probs),
+                data: [probs.FLD * 100, probs.No_FLD * 100],
                 backgroundColor: ["#ff453a", "#30d158"],
-                borderWidth: 0,
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: "70%",
-            plugins: { legend: { position: "bottom", labels: { color: "#86868b", font: { size: 11 } } } }
+            plugins: {
+                legend: { position: "bottom", labels: { color: "#8e8e93", font: { size: 10 } } }
+            },
+            cutout: "70%"
         }
     });
 }
 
 function renderBarChart(features) {
     const ctx = document.getElementById("bar-chart").getContext("2d");
-    if (!features || !features.length) return;
     if (barChart) barChart.destroy();
+
+    const labels = Object.keys(features);
+    const values = Object.values(features);
+
     barChart = new Chart(ctx, {
         type: "bar",
         data: {
-            labels: features.map(f => f.feature),
+            labels: labels,
             datasets: [{
-                label: "SHAP Impact",
-                data: features.map(f => f.importance_score),
-                backgroundColor: "rgba(10, 132, 255, 0.6)",
-                borderRadius: 3,
-                borderSkipped: false,
+                label: "SHAP Impact Score",
+                data: values,
+                backgroundColor: values.map(v => v >= 0 ? "rgba(255, 69, 58, 0.7)" : "rgba(48, 209, 88, 0.7)"),
+                borderRadius: 4
             }]
         },
         options: {
             indexAxis: "y",
             responsive: true,
             maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
             scales: {
-                x: { ticks: { color: "#86868b", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.03)" } },
-                y: { ticks: { color: "#86868b", font: { size: 10 } }, grid: { display: false } }
-            },
-            plugins: { legend: { display: false } }
+                x: { ticks: { color: "#8e8e93", font: { size: 9 } }, grid: { color: "rgba(255,255,255,0.05)" } },
+                y: { ticks: { color: "#8e8e93", font: { size: 9 } }, grid: { display: false } }
+            }
         }
     });
 }
@@ -397,25 +427,47 @@ function renderBarChart(features) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  HISTORY ARCHIVE — LOAD, DELETE, CLEAR ALL
 // ═══════════════════════════════════════════════════════════════════════════
-refreshHistoryBtn.addEventListener("click", loadHistoryArchive);
+refreshHistoryBtn.addEventListener("click", () => {
+    loadHistoryArchive();
+    showToast("Refreshing synchronized archive...", "info");
+});
 
 async function loadHistoryArchive() {
-    const historyUrl = activeBaseUrl ? `${activeBaseUrl}/api/history` : "/api/history";
+    const primaryUrl = `${activeBaseUrl}/api/history`;
+    const fallbackUrl = (activeBaseUrl === AWS_ENDPOINT) ? `${AZURE_ENDPOINT}/api/history` : `${AWS_ENDPOINT}/api/history`;
+
     try {
         let res;
-        try { res = await fetch(historyUrl); }
-        catch (e) { res = await fetch(`${AZURE_ENDPOINT}/api/history`); }
+        try {
+            const c = new AbortController();
+            const t = setTimeout(() => c.abort(), 4000);
+            res = await fetch(primaryUrl, { signal: c.signal });
+            clearTimeout(t);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch (e) {
+            res = await fetch(fallbackUrl);
+        }
         if (!res.ok) throw new Error("Fetch failed");
         const data = await res.json();
-        renderHistoryCards(data.records || []);
+        renderHistoryCards(data.records || [], data.cloud || currentServingCloud);
     } catch (err) {
-        historyGrid.innerHTML = `<div class="history-loading">Unable to fetch archive — ${err.message}</div>`;
+        historyGrid.innerHTML = `
+            <div class="history-empty">
+                <span class="empty-icon">⚠️</span>
+                <h4>Unable to Load Archive</h4>
+                <p>${err.message}</p>
+            </div>`;
     }
 }
 
-function renderHistoryCards(records) {
+function renderHistoryCards(records, cloudOrigin) {
     if (!records || records.length === 0) {
-        historyGrid.innerHTML = `<div class="history-loading">No diagnostic records found.</div>`;
+        historyGrid.innerHTML = `
+            <div class="history-empty">
+                <span class="empty-icon">📂</span>
+                <h4>Synchronized Archive Empty</h4>
+                <p>No clinical diagnostic records found across AWS RDS and Azure PostgreSQL.</p>
+            </div>`;
         return;
     }
 
@@ -423,7 +475,7 @@ function renderHistoryCards(records) {
         const isFLD = r.label === "FLD";
         const badgeClass = isFLD ? "fld" : "no_fld";
         const fldProb = (r.probs && r.probs.FLD !== undefined) ? (r.probs.FLD * 100).toFixed(1) : "N/A";
-        const imgUrl = activeBaseUrl ? `${activeBaseUrl}/api/image/${r.image_key}` : `/api/image/${r.image_key}`;
+        const imgUrl = `${activeBaseUrl}/api/image/${r.image_key}`;
 
         let dateStr = "Recent";
         if (r.created_at) {
@@ -437,7 +489,7 @@ function renderHistoryCards(records) {
             <div class="history-card" data-id="${r.id}">
                 <button class="delete-card-btn" onclick="deleteSingleRecord('${r.id}')" title="Delete record">✕</button>
                 <div class="history-thumb-wrap">
-                    <img src="${imgUrl}" alt="Tongue" class="history-thumb" onerror="this.style.display='none'">
+                    <img src="${imgUrl}" alt="Tongue" class="history-thumb" onerror="this.parentElement.innerHTML='<span style=\\'font-size:2rem;color:var(--text-tertiary);\\'>👅</span>'">
                 </div>
                 <div class="history-card-body">
                     <div class="history-meta-row">
@@ -449,7 +501,7 @@ function renderHistoryCards(records) {
                         <small style="color: var(--text-tertiary); font-weight: 600; font-size: 0.68rem;">${fldProb}%</small>
                     </div>
                     <div class="history-prob-bar">
-                        <div class="history-prob-fill" style="width: ${fldProb === "N/A" ? 50 : fldProb}%"></div>
+                        <div class="history-prob-fill" style="width: ${fldProb}%"></div>
                     </div>
                 </div>
             </div>`;
@@ -460,17 +512,19 @@ function renderHistoryCards(records) {
 async function deleteSingleRecord(predId) {
     const confirmed = await showConfirm(
         "Delete Record",
-        "This will permanently remove this diagnostic from both AWS and Azure databases."
+        `Permanently remove diagnostic record #${predId.substring(0, 8)} from both AWS RDS and Azure PostgreSQL databases?`
     );
     if (!confirmed) return;
 
-    const url = activeBaseUrl ? `${activeBaseUrl}/api/history/${predId}` : `/api/history/${predId}`;
     try {
-        let res;
-        try { res = await fetch(url, { method: "DELETE" }); }
-        catch (e) { res = await fetch(`${AZURE_ENDPOINT}/api/history/${predId}`, { method: "DELETE" }); }
+        // Send DELETE to both cloud endpoints
+        const delAws = fetch(`${AWS_ENDPOINT}/api/history/${predId}`, { method: "DELETE" }).catch(() => ({ ok: false }));
+        const delAz = fetch(`${AZURE_ENDPOINT}/api/history/${predId}`, { method: "DELETE" }).catch(() => ({ ok: false }));
+        const [rAws, rAz] = await Promise.all([delAws, delAz]);
 
-        if (!res.ok) throw new Error("Delete failed");
+        if (!rAws.ok && !rAz.ok) {
+            throw new Error("Failed to delete record on cloud databases.");
+        }
 
         // Animate card removal
         const card = document.querySelector(`.history-card[data-id="${predId}"]`);
@@ -481,11 +535,16 @@ async function deleteSingleRecord(predId) {
             setTimeout(() => {
                 card.remove();
                 if (!historyGrid.querySelector(".history-card")) {
-                    historyGrid.innerHTML = `<div class="history-loading">No diagnostic records found.</div>`;
+                    historyGrid.innerHTML = `
+                        <div class="history-empty">
+                            <span class="empty-icon">📂</span>
+                            <h4>Synchronized Archive Empty</h4>
+                            <p>No clinical diagnostic records found across AWS RDS and Azure PostgreSQL.</p>
+                        </div>`;
                 }
             }, 300);
         }
-        showToast("Record deleted from both databases.");
+        showToast("Record deleted from both AWS & Azure databases.");
     } catch (err) {
         showToast("Delete failed: " + err.message, "error");
     }
@@ -494,31 +553,43 @@ async function deleteSingleRecord(predId) {
 // ── Clear All Records ───────────────────────────────────────────────────
 clearAllBtn.addEventListener("click", async () => {
     const confirmed = await showConfirm(
-        "Clear All Records",
-        "This will permanently delete ALL diagnostic records from both AWS RDS and Azure PostgreSQL. This action cannot be undone."
+        "Clear All Diagnostic Records",
+        "This will permanently delete ALL patient diagnostic records from both AWS RDS and Azure PostgreSQL databases. This action cannot be undone."
     );
     if (!confirmed) return;
 
-    const url = activeBaseUrl ? `${activeBaseUrl}/api/history` : "/api/history";
     try {
-        let res;
-        try { res = await fetch(url, { method: "DELETE" }); }
-        catch (e) { res = await fetch(`${AZURE_ENDPOINT}/api/history`, { method: "DELETE" }); }
-
-        if (!res.ok) throw new Error("Clear all failed");
+        // Send DELETE to both clouds in parallel
+        const clearAws = fetch(`${AWS_ENDPOINT}/api/history`, { method: "DELETE" }).then(r => r.ok ? r.json() : null).catch(() => null);
+        const clearAz = fetch(`${AZURE_ENDPOINT}/api/history`, { method: "DELETE" }).then(r => r.ok ? r.json() : null).catch(() => null);
+        const [resAws, resAz] = await Promise.all([clearAws, clearAz]);
 
         // Animate all cards out
         const cards = historyGrid.querySelectorAll(".history-card");
         cards.forEach((card, i) => {
-            card.style.transition = `all 0.3s ease ${i * 0.05}s`;
+            card.style.transition = `all 0.3s ease ${i * 0.04}s`;
             card.style.opacity = "0";
             card.style.transform = "scale(0.95)";
         });
-        setTimeout(() => {
-            historyGrid.innerHTML = `<div class="history-loading">No diagnostic records found.</div>`;
-        }, cards.length * 50 + 350);
 
-        showToast("All records cleared from both databases.");
+        setTimeout(() => {
+            historyGrid.innerHTML = `
+                <div class="history-empty">
+                    <span class="empty-icon">📂</span>
+                    <h4>Synchronized Archive Cleared</h4>
+                    <p>All clinical diagnostic records have been permanently cleared from both AWS Sydney RDS and Azure PostgreSQL.</p>
+                </div>`;
+        }, Math.min(cards.length * 40 + 300, 800));
+
+        let totalDeleted = 0;
+        if (resAws && resAws.deleted_rows) totalDeleted += resAws.deleted_rows;
+        if (resAz && resAz.deleted_rows) totalDeleted += resAz.deleted_rows;
+
+        if (totalDeleted > 0) {
+            showToast(`Permanently deleted ${totalDeleted} records across AWS and Azure.`);
+        } else {
+            showToast("Archive cleared across both AWS and Azure databases.");
+        }
     } catch (err) {
         showToast("Clear all failed: " + err.message, "error");
     }

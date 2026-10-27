@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLD-Screen — AI Diagnostic Platform</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Background Orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="dashboard-container">
+        <!-- Main Header -->
+        <header class="glass-panel main-header">
+            <div class="logo">
+                <h1>FLD<span>Screen</span></h1>
+                <p>AI Screening Platform &bull; Multi-Cloud Active-Standby DR System</p>
+            </div>
+            
+            <!-- Real-Time DR Status Indicator -->
+            <div class="dr-header-status">
+                <div class="cloud-badge" id="aws-status-badge">
+                    <span class="status-indicator live" id="aws-dot"></span>
+                    <div class="badge-text">
+                        <span class="cloud-label">AWS Sydney (Primary)</span>
+                        <strong id="aws-state">ONLINE</strong>
+                    </div>
+                </div>
+
+                <div class="replication-indicator" title="Watermark CDC & Rclone sync active">
+                    <span class="sync-arrows">⇄</span>
+                    <small id="sync-status">Replication Sync Active</small>
+                </div>
+
+                <div class="cloud-badge" id="azure-status-badge">
+                    <span class="status-indicator standby" id="azure-dot"></span>
+                    <div class="badge-text">
+                        <span class="cloud-label">Azure Hong Kong (Standby)</span>
+                        <strong id="azure-state">HOT STANDBY</strong>
+                    </div>
+                </div>
+
+                <div class="active-route-pill" id="active-route-pill">
+                    <span class="pulse-ring"></span>
+                    <span>Serving via: <strong id="current-serving-cloud">AWS Primary</strong></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dedicated Multi-Cloud Infrastructure & DR Control Center -->
+        <section class="glass-panel dr-control-panel">
+            <div class="dr-panel-header">
+                <div class="dr-panel-title">
+                    <span class="pulse-icon">⚡</span>
+                    <div>
+                        <h3>Multi-Cloud High-Availability & Disaster Recovery System</h3>
+                        <p>Real-time cross-cloud active-standby topology (AWS Sydney ⇄ Azure Hong Kong)</p>
+                    </div>
+                </div>
+                <div class="dr-controls">
+                    <button id="simulate-outage-btn" class="dr-action-btn warning-btn" title="Simulate AWS outage to trigger instant auto-failover to Azure">
+                        ⚡ Force Shutdown AWS (Simulate Outage)
+                    </button>
+                    <button id="restore-primary-btn" class="dr-action-btn success-btn hidden" title="Restore AWS primary server route">
+                        ♻️ Restore AWS Primary Route
+                    </button>
+                </div>
+            </div>
+
+            <div class="dr-servers-grid">
+                <!-- AWS Primary Card -->
+                <div class="dr-server-card primary-server" id="card-aws">
+                    <div class="server-card-header">
+                        <div class="server-brand">
+                            <span class="server-icon">☁️</span>
+                            <div>
+                                <h4>AWS Sydney — Primary</h4>
+                                <span class="server-endpoint">54.66.222.189 &bull; ap-southeast-2</span>
+                            </div>
+                        </div>
+                        <span class="server-status-pill online" id="card-aws-status">ACTIVE PRIMARY</span>
+                    </div>
+                    <div class="server-card-metrics">
+                        <div class="metric-item">
+                            <small>Compute</small>
+                            <span>EC2 t3.small</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Database</small>
+                            <span>PostgreSQL RDS</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Storage</small>
+                            <span>AWS S3</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Latency</small>
+                            <span id="aws-latency">-- ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sync Bridge -->
+                <div class="dr-sync-bridge">
+                    <div class="sync-arrows">⇄</div>
+                    <div class="sync-label">
+                        <strong>CDC Sync</strong>
+                        <small>RPO &lt; 5s</small>
+                    </div>
+                </div>
+
+                <!-- Azure Standby Card -->
+                <div class="dr-server-card standby-server" id="card-azure">
+                    <div class="server-card-header">
+                        <div class="server-brand">
+                            <span class="server-icon">🔷</span>
+                            <div>
+                                <h4>Azure East Asia — Standby</h4>
+                                <span class="server-endpoint">20.187.68.47:8000 &bull; Hong Kong</span>
+                            </div>
+                        </div>
+                        <span class="server-status-pill standby" id="card-azure-status">HOT STANDBY</span>
+                    </div>
+                    <div class="server-card-metrics">
+                        <div class="metric-item">
+                            <small>Compute</small>
+                            <span>Azure VM B1s</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Database</small>
+                            <span>Azure Flexible Server</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Storage</small>
+                            <span>Azure Blob</span>
+                        </div>
+                        <div class="metric-item">
+                            <small>Latency</small>
+                            <span id="azure-latency">-- ms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Traffic Routing Banner -->
+            <div class="routing-alert-banner" id="routing-banner">
+                <span class="traffic-beacon" id="routing-beacon"></span>
+                <span>Active Routing: All screening requests currently served by <strong id="routing-target-text">AWS Sydney (Primary)</strong>. Zero Data Loss Guaranteed.</span>
+            </div>
+        </section>
+
+        <!-- Main Workspace -->
+        <main class="content-grid">
+            <!-- Left Panel: Patient Clinical Input & Image -->
+            <section class="glass-panel upload-section">
+                <div class="panel-header">
+                    <h2>1. Patient Clinical Input</h2>
+                    <span class="step-tag">Step 1</span>
+                </div>
+                
+                <form id="predict-form">
+                    <!-- Image Upload Zone -->
+                    <div class="upload-zone" id="drop-zone">
+                        <input type="file" id="image-upload" name="file" accept="image/jpeg, image/png" required hidden>
+                        <label for="image-upload" class="upload-label">
+                            <div class="upload-icon">📸</div>
+                            <span id="file-name">Click or Drag & Drop Tongue Photo<br><small>PNG, JPG up to 10MB</small></span>
+                        </label>
+                    </div>
+
+                    <!-- Clinical Details -->
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label>Age (years)</label>
+                            <input type="number" name="age" placeholder="e.g. 45" min="1" max="120" value="45">
+                        </div>
+                        <div class="input-group">
+                            <label>Gender</label>
+                            <select name="gender">
+                                <option value="1" selected>Male</option>
+                                <option value="0">Female</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Height (cm)</label>
+                            <input type="number" name="height" placeholder="e.g. 170" step="0.1" value="170">
+                        </div>
+                        <div class="input-group">
+                            <label>Weight (kg)</label>
+                            <input type="number" name="weight" placeholder="e.g. 70" step="0.1" value="70">
+                        </div>
+                        <div class="input-group">
+                            <label>Waist (cm)</label>
+                            <input type="number" name="waist" placeholder="e.g. 85" step="0.1" value="85">
+                        </div>
+                        <div class="input-group">
+                            <label>Hipline (cm)</label>
+                            <input type="number" name="hipline" placeholder="e.g. 95" step="0.1" value="95">
+                        </div>
+                        <div class="input-group">
+                            <label>Systolic BP (mmHg)</label>
+                            <input type="number" name="sbp" placeholder="e.g. 120" step="1" value="120">
+                        </div>
+                        <div class="input-group">
+                            <label>Diastolic BP (mmHg)</label>
+                            <input type="number" name="dbp" placeholder="e.g. 80" step="1" value="80">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submit-btn">Run AI Diagnostic</button>
+                    <div id="loading-spinner" class="spinner hidden"></div>
+                </form>
+            </section>
+
+            <!-- Right Panel: Real-time Diagnostic Analysis -->
+            <section class="glass-panel results-section" id="results-panel">
+                <div class="panel-header">
+                    <h2>2. AI Diagnostic Results</h2>
+                    <span class="step-tag">Step 2</span>
+                </div>
+
+                <div class="results-placeholder">
+                    <p>Upload a tongue image and submit clinical parameters to view AI inference and SHAP explainability.</p>
+                </div>
+                
+                <div class="results-content hidden" id="results-content">
+                    <div class="primary-result">
+                        <h3>Prediction Target</h3>
+                        <div class="result-badge" id="result-label">Processing...</div>
+                    </div>
+
+                    <div class="charts-container">
+                        <div class="chart-box">
+                            <h4>Probability Split</h4>
+                            <div class="canvas-wrapper">
+                                <canvas id="donut-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-box">
+                            <h4>SHAP Feature Importance</h4>
+                            <div class="canvas-wrapper">
+                                <canvas id="bar-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="disclaimer-box">
+                        <strong>⚠️ Medical Disclaimer:</strong> <span id="disclaimer-text"></span>
+                        <p class="served-by" id="served-by-text"></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Section 3: Replicated Patient Archive (Proof of DR Zero Data Loss) -->
+        <section class="glass-panel history-section">
+            <div class="history-header">
+                <div>
+                    <h2>3. Synchronized Diagnostic Archive</h2>
+                    <p class="history-subtitle">Cross-cloud replicated records — AWS Primary ⇄ Azure Standby via CDC & Rclone. Zero data loss.</p>
+                </div>
+                <div class="history-actions">
+                    <button id="refresh-history-btn" class="btn-icon">↻ Refresh</button>
+                    <button id="clear-all-btn" class="btn-icon btn-danger">✕ Clear All</button>
+                </div>
+            </div>
+
+            <div class="history-grid" id="history-grid">
+                <div class="history-loading">Loading synchronized records...</div>
+            </div>
+        </section>
+
+        <!-- Toast Notification Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

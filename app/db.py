@@ -32,15 +32,24 @@ CREATE INDEX IF NOT EXISTS idx_predictions_updated ON predictions (updated_at);
 
 
 def get_connection(db_url: Optional[str] = None):
-    """Returns a psycopg connection, or None if DB is unavailable."""
-    url = db_url or DATABASE_URL
-    if not PSYCOPG_AVAILABLE or not url:
+    """Returns a psycopg connection, or None if DB is unavailable, with automatic cloud fallback."""
+    if not PSYCOPG_AVAILABLE:
         return None
-    try:
-        return psycopg.connect(url, connect_timeout=3)
-    except Exception as e:
-        print(f"[db.py] DB connection failed: {e}")
-        return None
+    candidate_urls = []
+    if db_url:
+        candidate_urls.append(db_url)
+    elif DATABASE_URL:
+        candidate_urls.append(DATABASE_URL)
+    for u in get_all_db_urls():
+        if u not in candidate_urls:
+            candidate_urls.append(u)
+
+    for url in candidate_urls:
+        try:
+            return psycopg.connect(url, connect_timeout=2.5)
+        except Exception:
+            continue
+    return None
 
 
 def init_db() -> bool:
@@ -110,7 +119,7 @@ def db_reachable() -> bool:
         conn.close()
 
 
-def get_recent_predictions(limit: int = 10):
+def get_recent_predictions(limit: int = 15):
     """Fetches recent prediction records with timestamps, keys, and labels."""
     conn = get_connection()
     if conn is None:
@@ -148,13 +157,14 @@ def get_recent_predictions(limit: int = 10):
 def get_all_db_urls() -> list:
     """Returns all available cloud database URLs (AWS RDS + Azure PG)."""
     urls = []
-    for var in ["DATABASE_URL", "TARGET_DATABASE_URL", "SOURCE_DATABASE_URL"]:
-        val = os.getenv(var)
-        if val and val not in urls:
-            urls.append(val)
-    # Ensure both AWS RDS and Azure Standby URLs are present
     aws_rds = "postgresql://fld_user:FldSecurePass2026!@fld-pg.cj4y80kwm16d.ap-southeast-2.rds.amazonaws.com:5432/fld_db"
     azure_pg = "postgresql://fld_user:FldSecurePass2026!@fld-pg-standby-fld01.postgres.database.azure.com:5432/fld_db?sslmode=require"
+    
+    for var in ["DATABASE_URL", "TARGET_DATABASE_URL", "SOURCE_DATABASE_URL"]:
+        val = os.getenv(var)
+        if val and val not in urls and "localhost" not in val and "127.0.0.1" not in val:
+            urls.append(val)
+            
     if aws_rds not in urls:
         urls.append(aws_rds)
     if azure_pg not in urls:
@@ -166,32 +176,39 @@ def delete_prediction(pred_id: str) -> dict:
     """Deletes a prediction record by UUID across BOTH AWS and Azure databases."""
     deleted_from = []
     errors = []
+    row_found = False
     for url in get_all_db_urls():
         try:
-            with psycopg.connect(url, connect_timeout=4) as conn:
+            with psycopg.connect(url, connect_timeout=2.5) as conn:
                 with conn.cursor() as cur:
                     cur.execute("DELETE FROM predictions WHERE id = %s", (pred_id,))
+                    if cur.rowcount > 0:
+                        row_found = True
                 conn.commit()
-                # Extract clean hostname
                 host = url.split("@")[-1].split("/")[0]
                 deleted_from.append(host)
         except Exception as e:
             errors.append(f"{url.split('@')[-1].split('/')[0]}: {e}")
-    return {"deleted_id": pred_id, "targets": deleted_from, "errors": errors}
+    return {"deleted_id": pred_id, "found": row_found, "targets": deleted_from, "errors": errors}
 
 
 def clear_all_predictions() -> dict:
-    """Deletes ALL records across BOTH AWS and Azure databases."""
+    """Deletes ALL records across BOTH AWS and Azure databases using DELETE to ensure compatibility."""
     cleared_from = []
     errors = []
+    total_deleted = 0
     for url in get_all_db_urls():
         try:
-            with psycopg.connect(url, connect_timeout=4) as conn:
+            with psycopg.connect(url, connect_timeout=2.5) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("TRUNCATE TABLE predictions")
+                    cur.execute("DELETE FROM predictions")
+                    count = cur.rowcount
+                    if count >= 0:
+                        total_deleted += count
                 conn.commit()
                 host = url.split("@")[-1].split("/")[0]
-                cleared_from.append(host)
+                cleared_from.append(f"{host} ({count} rows)")
         except Exception as e:
             errors.append(f"{url.split('@')[-1].split('/')[0]}: {e}")
-    return {"status": "all_cleared", "targets": cleared_from, "errors": errors}
+    return {"status": "all_cleared", "deleted_rows": total_deleted, "targets": cleared_from, "errors": errors}
+
